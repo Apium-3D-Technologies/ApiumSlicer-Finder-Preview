@@ -1,0 +1,41 @@
+*
+
+!/.gitignore
+!/.gitattributes
+!/LICENSE
+!/README.md
+!/Package.swift
+!/project.yml
+!/doc/
+!/doc/*md
+
+
+!/App/
+!/App/*.swift
+
+
+!/Extensions/
+!/Extensions/**/
+!/Extensions/**/*.swift
+!/Extensions/**/*.plist
+!/Extensions/**/*.entitlements
+
+# Shared sources
+!/Sources/
+!/Sources/**/
+!/Sources/**/*.swift
+
+# Tests
+!/Tests/
+!/Tests/**/
+!/Tests/**/*.swift
+
+!/scripts/
+!/scripts/*.sh
+
+# local and generated files
+.DS_Store
+build/
+.build/
+ApiumQuickLookPreview.xcodeproj/
+project.local.yml
