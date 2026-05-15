@@ -1,0 +1,106 @@
+name: ApiumQuickLookPreview
+options:
+  bundleIdPrefix: com.apium
+  deploymentTarget:
+    macOS: "13.0"
+settings:
+  base:
+    SWIFT_VERSION: "5.9"
+    MARKETING_VERSION: "1.0"
+    CURRENT_PROJECT_VERSION: "1"
+packages: {}
+targets:
+  ApiumQuickLookHost:
+    type: application
+    platform: macOS
+    sources:
+      - App
+    info:
+      path: App/Info.plist
+      properties:
+        UTExportedTypeDeclarations:
+          - UTTypeIdentifier: com.apium.gcode
+            UTTypeDescription: Apium GCode File
+            UTTypeConformsTo:
+              - public.text
+              - public.data
+            UTTypeTagSpecification:
+              public.filename-extension:
+                - gcode
+              public.mime-type:
+                - text/x.gcode
+        UTImportedTypeDeclarations:
+          - UTTypeIdentifier: org.3mfproject.3mf
+            UTTypeDescription: 3MF File
+            UTTypeConformsTo:
+              - public.data
+            UTTypeTagSpecification:
+              public.filename-extension:
+                - 3mf
+        CFBundleDocumentTypes:
+          - CFBundleTypeName: Apium GCode File
+            LSItemContentTypes:
+              - com.apium.gcode
+          - CFBundleTypeName: 3MF File
+            LSItemContentTypes:
+              - org.3mfproject.3mf
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.apium.quicklook.host
+        CODE_SIGN_STYLE: Automatic
+        GENERATE_INFOPLIST_FILE: NO
+    dependencies:
+      - target: ApiumQuickLookThumbnailExtension
+      - target: ApiumQuickLookPreviewExtension
+
+  ApiumQuickLookThumbnailExtension:
+    type: app-extension
+    platform: macOS
+    sources:
+      - Extensions/ThumbnailExtension
+      - Sources/ApiumQuickLookShared
+    info:
+      path: Extensions/ThumbnailExtension/Info.plist
+      properties:
+        NSExtension:
+          NSExtensionAttributes:
+            QLSupportedContentTypes:
+              - com.apium.gcode
+              - org.3mfproject.3mf
+          NSExtensionPointIdentifier: com.apple.quicklook.thumbnail
+          NSExtensionPrincipalClass: "$(PRODUCT_MODULE_NAME).ThumbnailProvider"
+        LSItemContentTypes:
+          - com.apium.gcode
+          - org.3mfproject.3mf
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.apium.quicklook.host.thumbnail
+        CODE_SIGN_STYLE: Automatic
+        CODE_SIGN_ENTITLEMENTS: Extensions/ThumbnailExtension/ThumbnailExtension.entitlements
+    dependencies: []
+
+  ApiumQuickLookPreviewExtension:
+    type: app-extension
+    platform: macOS
+    sources:
+      - Extensions/PreviewExtension
+      - Sources/ApiumQuickLookShared
+    info:
+      path: Extensions/PreviewExtension/Info.plist
+      properties:
+        NSExtension:
+          NSExtensionAttributes:
+            QLSupportedContentTypes:
+              - com.apium.gcode
+              - org.3mfproject.3mf
+          NSExtensionPointIdentifier: com.apple.quicklook.preview
+          NSExtensionPrincipalClass: "$(PRODUCT_MODULE_NAME).PreviewViewController"
+        LSItemContentTypes:
+          - com.apium.gcode
+          - org.3mfproject.3mf
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.apium.quicklook.host.preview
+        CODE_SIGN_STYLE: Automatic
+        CODE_SIGN_ENTITLEMENTS: Extensions/PreviewExtension/PreviewExtension.entitlements
+    dependencies: []
