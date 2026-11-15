@@ -11,53 +11,59 @@ public struct GCodeParser: PreviewParsing {
         let handle = try FileHandle(forReadingFrom: url)
         defer { try? handle.close() }
 
-        let size = Int((try handle.seekToEnd()))
-        guard size > 0 else {
-            return PreviewMetadata(isApiumFile: false)
+        return try parse(size: handle.seekToEnd()) { offset, length in
+            try handle.seek(toOffset: offset)
+            var result = Data()
+            while result.count < length {
+                guard let chunk = try handle.read(upToCount: length - result.count), !chunk.isEmpty else {
+                    throw PreviewParserError.unreadableFile
+                }
+                result.append(chunk)
+            }
+            return result
         }
-
-        let tailLength = min(size, tailWindowBytes)
-        let tailOffset = max(0, size - tailLength)
-        try handle.seek(toOffset: UInt64(tailOffset))
-        let tailData = handle.readData(ofLength: tailLength)
-
-        let tailParsed = parseDataChunk(tailData)
-        if tailParsed.shouldFallbackToFullScan {
-            try handle.seek(toOffset: 0)
-            let fullData = handle.readDataToEndOfFile()
-            let fullParsed = parseDataChunk(fullData)
-            return fullParsed.metadata
-        }
-
-        return tailParsed.metadata
     }
 
-    private func parseDataChunk(_ data: Data) -> (metadata: PreviewMetadata, shouldFallbackToFullScan: Bool) {
-        guard let text = String(data: data, encoding: .utf8) ?? String(data: data, encoding: .ascii) else {
-            return (PreviewMetadata(isApiumFile: false), true)
+    // Keep I/O bounded even for missing metadata or malformed thumbnails.
+    // The injectable range reader lets tests reject reads into the G-code body.
+    func parse(size: UInt64, read: (UInt64, Int) throws -> Data) throws -> PreviewMetadata {
+        guard size > 0 else { return PreviewMetadata() }
+        let limit = Int(min(size, UInt64(tailWindowBytes)))
+        var length = min(limit, 64 * 1024)
+        var tail = try read(size - UInt64(length), length)
+        while length < limit {
+            let text = String(decoding: tail, as: UTF8.self).lowercased()
+            let markers = ["; apiumslicer_config = begin", "; prusaslicer_config = begin"]
+            if markers.contains(where: { marker in
+                guard let range = text.range(of: marker, options: .backwards) else { return false }
+                return text.utf8.distance(from: text.utf8.startIndex, to: range.lowerBound) >= 4096
+            }) { break }
+            let next = min(length * 2, limit)
+            let prefix = try read(size - UInt64(next), next - length)
+            tail.insert(contentsOf: prefix, at: 0)
+            length = next
         }
 
-        var metadata = PreviewMetadata()
+        var tailText = String(decoding: tail, as: UTF8.self)
+        if UInt64(length) < size {
+            tailText = tailText.firstIndex(of: "\n").map { String(tailText[tailText.index(after: $0)...]) } ?? ""
+        }
+        var metadata = parseText(tailText)
+        if (!metadata.isApiumFile || metadata.previewImage == nil), UInt64(length) < size {
+            let headerLength = Int(min(size - UInt64(length), 1024 * 1024))
+            var header = String(decoding: try read(0, headerLength), as: UTF8.self)
+            header = header.lastIndex(of: "\n").map { String(header[...$0]) } ?? ""
+            // Footer values and images take precedence over legacy headers.
+            metadata = parseText(header + "\n" + tailText)
+        }
+        return metadata
+    }
+
+    private func parseText(_ text: String) -> PreviewMetadata {
+        var metadata = MetadataHelpers.metadata(from: MetadataHelpers.parseCommentKeyValueLines(from: text))
         metadata.isApiumFile = isApium(text: text)
-
-        let kv = MetadataHelpers.parseCommentKeyValueLines(from: text)
-        metadata.printer = MetadataHelpers.pick(["printer_model", "printer_settings_id", "printer_vendor"], from: kv)
-        metadata.materialType = MetadataHelpers.pick(["filament_type", "filament_settings_id"], from: kv)
-        metadata.nozzleDiameter = MetadataHelpers.parseNozzleDiameter(from: kv)
-        metadata.nozzleTemperature = MetadataHelpers.parseNozzleTemperature(from: kv)
-        metadata.bedTemperature = MetadataHelpers.parseBedTemperature(from: kv)
-        metadata.layerHeight = MetadataHelpers.parseLayerHeight(from: kv)
-        metadata.perimeters = MetadataHelpers.parsePerimeters(from: kv)
-        metadata.infillPattern = MetadataHelpers.parseInfillPattern(from: kv)
-        metadata.infillDensity = MetadataHelpers.parseInfillDensity(from: kv)
-        metadata.printTime = MetadataHelpers.pick(["estimated printing time (normal mode)", "estimated printing time"], from: kv)
         metadata.previewImage = extractThumbnailImage(from: text)
-
-        let hasAllMetadata = metadata.printer != nil && metadata.materialType != nil && metadata.nozzleDiameter != nil && metadata.printTime != nil
-        let hasThumbnail = metadata.previewImage != nil
-        let fallback = !(hasAllMetadata && hasThumbnail)
-
-        return (metadata, fallback)
+        return metadata
     }
 
     private func isApium(text: String) -> Bool {
@@ -93,7 +99,7 @@ public struct GCodeParser: PreviewParsing {
                 let ordered = collectedBase64Lines.reversed()
                 let payload = ordered.joined()
                 if let data = Data(base64Encoded: payload, options: [.ignoreUnknownCharacters]) {
-                    return decodeImage(data)
+                    if let image = decodeImage(data) { return image }
                 }
                 collecting = false
                 collectedBase64Lines.removeAll(keepingCapacity: true)
