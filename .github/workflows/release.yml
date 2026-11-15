@@ -1,0 +1,65 @@
+name: Release
+
+on:
+  push:
+    tags: ['**']
+
+permissions:
+  contents: read
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  release:
+    name: Build and release macOS universal
+    runs-on: macos-15
+    timeout-minutes: 30
+    permissions:
+      contents: write
+    env:
+      RELEASE_TAG: ${{ github.ref_name }}
+    steps:
+      - name: Check out tagged source
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          persist-credentials: false
+      - name: Install XcodeGen
+        run: brew install xcodegen
+      - name: Test parsers and renderer
+        run: swift test
+      - name: Build universal app and extensions
+        env:
+          GENERATE_XCODEPROJ: '1'
+          CONFIGURATION: Release
+          UNSIGNED: '1'
+          UNIVERSAL: '1'
+        run: |
+          if [[ "$RELEASE_TAG" =~ ^v?([0-9]+\.[0-9]+\.[0-9]+)([-+].*)?$ ]]; then
+            export RELEASE_VERSION="${BASH_REMATCH[1]}"
+          fi
+          ./scripts/build.sh
+      - name: Package release assets
+        run: ./scripts/package-release.sh
+      - name: Publish release with assets
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          prerelease=true
+          if [[ "$RELEASE_TAG" =~ ^v?[0-9]+\.[0-9]+\.[0-9]+(\+[0-9A-Za-z.-]+)?$ ]]; then
+            prerelease=false
+          fi
+          release_args=("--prerelease=$prerelease")
+          if [[ "$prerelease" == true ]]; then release_args+=(--latest=false); fi
+          if is_draft=$(gh release view "$RELEASE_TAG" --json isDraft --jq '.isDraft' 2>/dev/null); then
+            [[ "$is_draft" == true ]] || { echo "Release already published; push a new tag." >&2; exit 1; }
+          else
+            gh release create "$RELEASE_TAG" --verify-tag --draft --generate-notes \
+              --title "$RELEASE_TAG" "${release_args[@]}"
+          fi
+          # Failed uploads leave a draft that a rerun can complete.
+          gh release upload "$RELEASE_TAG" \
+            dist/ApiumSlicerFinderPreview-macos-universal.zip dist/SHA256SUMS.txt --clobber
+          gh release edit "$RELEASE_TAG" --draft=false "${release_args[@]}"

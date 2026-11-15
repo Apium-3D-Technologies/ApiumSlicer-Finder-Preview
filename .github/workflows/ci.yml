@@ -1,0 +1,32 @@
+name: CI
+
+on:
+  push:
+    branches: ['**']
+  pull_request:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    name: Test and build macOS
+    runs-on: macos-15
+    timeout-minutes: 30
+    steps:
+      - name: Check out source
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          persist-credentials: false
+      - name: Install XcodeGen
+        run: brew install xcodegen
+      - name: Test parsers and renderer
+        run: swift test
+      - name: Build universal app and extensions
+        run: GENERATE_XCODEPROJ=1 CONFIGURATION=Release UNSIGNED=1 UNIVERSAL=1 ./scripts/build.sh
+      - name: Verify and package app
+        run: ./scripts/package-release.sh

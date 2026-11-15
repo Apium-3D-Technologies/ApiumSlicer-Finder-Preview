@@ -50,6 +50,12 @@ XCODEBUILD_ARGS=(
   -derivedDataPath "$DERIVED_DATA_PATH"
   build
 )
+if [[ "${UNIVERSAL:-0}" == "1" ]]; then
+  XCODEBUILD_ARGS+=("ARCHS=arm64 x86_64" ONLY_ACTIVE_ARCH=NO)
+fi
+if [[ -n "${RELEASE_VERSION:-}" ]]; then
+  XCODEBUILD_ARGS+=("MARKETING_VERSION=$RELEASE_VERSION")
+fi
 
 if [[ "${UNSIGNED:-0}" == "1" ]]; then
   XCODEBUILD_ARGS+=(CODE_SIGNING_ALLOWED=NO)
@@ -58,7 +64,7 @@ else
 fi
 
 echo "[build] Building $SCHEME ($CONFIGURATION)"
-xcodebuild "${XCODEBUILD_ARGS[@]}"
+xcodebuild "${XCODEBUILD_ARGS[@]}" "$@"
 
 if [[ ! -d "$APP_SOURCE" ]]; then
   echo "error: Build finished but app not found at $APP_SOURCE" >&2
@@ -87,3 +93,7 @@ echo "[build] App: $APP_DEST"
 echo "[build] Binary: $BIN_DEST"
 echo "[build] Thumbnail appex: $THUMB_APPEX_DEST"
 echo "[build] Preview appex: $PREVIEW_APPEX_DEST"
+
+if [[ "${INSTALL:-0}" == "1" ]]; then
+  "$ROOT_DIR/scripts/register.sh" "$APP_DEST"
+fi
