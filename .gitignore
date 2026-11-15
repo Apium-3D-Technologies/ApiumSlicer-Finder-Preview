@@ -6,6 +6,8 @@
 !/README.md
 !/Package.swift
 !/project.yml
+!/version.inc
+!/version.xcconfig
 !/doc/
 !/doc/*md
 

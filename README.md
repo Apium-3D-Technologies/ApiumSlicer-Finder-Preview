@@ -31,11 +31,30 @@ GENERATE_XCODEPROJ=1 INSTALL=1 ./scripts/build.sh CODE_SIGN_IDENTITY=- CODE_SIGN
 `./scripts/unregister.sh [installed.app]` unregisters the app without deleting it.
 Enable the Quick Look extensions in System Settings if needed.
 
+## Version
+
+Edit `version.inc` to set the local app version and build number:
+
+```xcconfig
+MARKETING_VERSION = 1.0.0
+CURRENT_PROJECT_VERSION = 1
+```
+
+`version.xcconfig` includes this file for Debug and Release builds.
+The host app and both extensions inherit these settings; no project regeneration
+is needed when only the version changes. The host window and the macOS About
+dialog display the bundled version.
+
+For version tags such as `v1.2.3` or `v1.2.3-rc.1`, the pipeline overrides
+the app version with `1.2.3`; other tags use the value from `version.inc`.
+The build number always comes from `version.inc`. Local builds can also
+override the app version with `RELEASE_VERSION=1.2.3 ./scripts/build.sh`.
+
 ## CI and releases
 
-Pull requests and branch pushes run parser/renderer tests, generate the Xcode
-project, and build/package a universal app with both extensions. Every pushed
-tag runs the same checks and publishes a GitHub Release with:
+Only tag pushes start the pipeline. It runs parser/renderer tests, generates
+the Xcode project, builds/packages a universal app with both extensions, and
+publishes a GitHub Release with:
 
 - `ApiumSlicerFinderPreview-macos-universal.zip` (app, README and license)
 - `SHA256SUMS.txt`
@@ -44,6 +63,8 @@ Stable `vX.Y.Z` / `X.Y.Z` tags become regular releases; other tags become
 prereleases and do not replace the latest stable release. Assets are uploaded
 to a draft before publication; a failed upload can be retried. Published
 releases are never overwritten.
+
+To build and package a release locally:
 
 ```sh
 CONFIGURATION=Release GENERATE_XCODEPROJ=1 UNSIGNED=1 UNIVERSAL=1 ./scripts/build.sh
