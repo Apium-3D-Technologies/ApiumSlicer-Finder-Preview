@@ -7,5 +7,6 @@ public protocol PreviewParsing {
 public enum PreviewParserError: Error {
     case unsupportedFileType
     case unreadableFile
+    case invalidMesh
     case invalidArchive
 }

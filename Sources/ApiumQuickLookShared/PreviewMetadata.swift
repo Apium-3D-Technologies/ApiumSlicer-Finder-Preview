@@ -1,6 +1,7 @@
 import CoreGraphics
 
 public struct PreviewMetadata {
+    public var mesh: MeshDetails?
     public var previewImage: CGImage?
     public var printer: String?
     public var projectVersion: String?

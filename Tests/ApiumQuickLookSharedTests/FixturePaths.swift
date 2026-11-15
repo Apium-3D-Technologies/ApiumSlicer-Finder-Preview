@@ -9,10 +9,10 @@ enum FixturePaths {
     }
 
     static var gcodeURL: URL {
-        repositoryRoot.appendingPathComponent("example/gcode.gcode")
+        repositoryRoot.appendingPathComponent("Tests/ApiumQuickLookSharedTests/Fixtures/sample.gcode")
     }
 
     static var project3mfURL: URL {
-        repositoryRoot.appendingPathComponent("example/project.3mf")
+        repositoryRoot.appendingPathComponent("Tests/ApiumQuickLookSharedTests/Fixtures/project.3mf")
     }
 }

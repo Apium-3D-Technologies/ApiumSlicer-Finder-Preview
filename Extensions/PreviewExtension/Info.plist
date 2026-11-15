@@ -15,24 +15,30 @@
 	<key>CFBundlePackageType</key>
 	<string>XPC!</string>
 	<key>CFBundleShortVersionString</key>
-	<string>1.0</string>
+	<string>$(MARKETING_VERSION)</string>
 	<key>CFBundleVersion</key>
-	<string>1</string>
+	<string>$(CURRENT_PROJECT_VERSION)</string>
 	<key>LSItemContentTypes</key>
 	<array>
 		<string>com.apium.gcode</string>
 		<string>org.3mfproject.3mf</string>
+		<string>com.apium.a3d</string>
+		<string>public.standard-tesselated-geometry-format</string>
+		<string>public.geometry-definition-format</string>
 	</array>
 	<key>NSExtension</key>
 	<dict>
 		<key>NSExtensionAttributes</key>
 		<dict>
-		<key>QLSupportedContentTypes</key>
-		<array>
-			<string>com.apium.gcode</string>
-			<string>org.3mfproject.3mf</string>
-		</array>
-	</dict>
+			<key>QLSupportedContentTypes</key>
+			<array>
+				<string>com.apium.gcode</string>
+				<string>org.3mfproject.3mf</string>
+				<string>com.apium.a3d</string>
+				<string>public.standard-tesselated-geometry-format</string>
+				<string>public.geometry-definition-format</string>
+			</array>
+		</dict>
 		<key>NSExtensionPointIdentifier</key>
 		<string>com.apple.quicklook.preview</string>
 		<key>NSExtensionPrincipalClass</key>

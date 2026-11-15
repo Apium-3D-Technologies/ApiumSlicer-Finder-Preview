@@ -17,8 +17,7 @@ final class ThumbnailProvider: QLThumbnailProvider {
                     let canvas = context.boundingBoxOfClipPath
                     let rect = canvas.isEmpty ? CGRect(origin: .zero, size: targetSize) : canvas
                     let drawRect = Self.aspectFitRect(for: image, in: rect)
-                    context.setFillColor(CGColor(gray: 1.0, alpha: 1.0))
-                    context.fill(rect)
+                    context.clear(rect)
                     context.interpolationQuality = .high
                     context.draw(image, in: drawRect)
                     return true

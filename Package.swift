@@ -20,7 +20,8 @@ let package = Package(
         .testTarget(
             name: "ApiumQuickLookSharedTests",
             dependencies: ["ApiumQuickLookShared"],
-            path: "Tests/ApiumQuickLookSharedTests"
+            path: "Tests/ApiumQuickLookSharedTests",
+            exclude: ["Fixtures"]
         )
     ]
 )

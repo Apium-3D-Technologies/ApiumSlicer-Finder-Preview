@@ -22,6 +22,7 @@ final class PreviewViewController: NSViewController, QLPreviewingController {
             do {
                 let metadata = try PreviewParserFactory.parse(url: url)
                 DispatchQueue.main.async {
+                    self.children.forEach { $0.removeFromParent() }
                     self.view.subviews.forEach { $0.removeFromSuperview() }
 
                     let hosting = NSHostingController(rootView: QuickLookPreviewView(metadata: metadata))

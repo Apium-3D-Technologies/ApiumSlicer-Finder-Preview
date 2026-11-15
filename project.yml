@@ -6,7 +6,7 @@ options:
 settings:
   base:
     SWIFT_VERSION: "5.9"
-    MARKETING_VERSION: "1.0"
+    MARKETING_VERSION: "1.0.0"
     CURRENT_PROJECT_VERSION: "1"
 packages: {}
 targets:
@@ -18,6 +18,8 @@ targets:
     info:
       path: App/Info.plist
       properties:
+        CFBundleShortVersionString: "$(MARKETING_VERSION)"
+        CFBundleVersion: "$(CURRENT_PROJECT_VERSION)"
         UTExportedTypeDeclarations:
           - UTTypeIdentifier: com.apium.gcode
             UTTypeDescription: Apium GCode File
@@ -29,6 +31,13 @@ targets:
                 - gcode
               public.mime-type:
                 - text/x.gcode
+          - UTTypeIdentifier: com.apium.a3d
+            UTTypeDescription: ApiumSlicer Project
+            UTTypeConformsTo:
+              - public.zip-archive
+            UTTypeTagSpecification:
+              public.filename-extension:
+                - a3d
         UTImportedTypeDeclarations:
           - UTTypeIdentifier: org.3mfproject.3mf
             UTTypeDescription: 3MF File
@@ -37,11 +46,44 @@ targets:
             UTTypeTagSpecification:
               public.filename-extension:
                 - 3mf
+          - UTTypeIdentifier: public.standard-tesselated-geometry-format
+            UTTypeDescription: STL Model
+            UTTypeConformsTo:
+              - public.3d-content
+            UTTypeTagSpecification:
+              public.filename-extension:
+                - stl
+          - UTTypeIdentifier: public.geometry-definition-format
+            UTTypeDescription: OBJ Model
+            UTTypeConformsTo:
+              - public.3d-content
+            UTTypeTagSpecification:
+              public.filename-extension:
+                - obj
         CFBundleDocumentTypes:
+          - CFBundleTypeName: ApiumSlicer Project
+            CFBundleTypeRole: Viewer
+            LSHandlerRank: Alternate
+            LSItemContentTypes:
+              - com.apium.a3d
+          - CFBundleTypeName: STL Model
+            CFBundleTypeRole: Viewer
+            LSHandlerRank: Alternate
+            LSItemContentTypes:
+              - public.standard-tesselated-geometry-format
+          - CFBundleTypeName: OBJ Model
+            CFBundleTypeRole: Viewer
+            LSHandlerRank: Alternate
+            LSItemContentTypes:
+              - public.geometry-definition-format
           - CFBundleTypeName: Apium GCode File
+            CFBundleTypeRole: Viewer
+            LSHandlerRank: Alternate
             LSItemContentTypes:
               - com.apium.gcode
           - CFBundleTypeName: 3MF File
+            CFBundleTypeRole: Viewer
+            LSHandlerRank: Alternate
             LSItemContentTypes:
               - org.3mfproject.3mf
     settings:
@@ -62,16 +104,24 @@ targets:
     info:
       path: Extensions/ThumbnailExtension/Info.plist
       properties:
+        CFBundleShortVersionString: "$(MARKETING_VERSION)"
+        CFBundleVersion: "$(CURRENT_PROJECT_VERSION)"
         NSExtension:
           NSExtensionAttributes:
             QLSupportedContentTypes:
               - com.apium.gcode
               - org.3mfproject.3mf
+              - com.apium.a3d
+              - public.standard-tesselated-geometry-format
+              - public.geometry-definition-format
           NSExtensionPointIdentifier: com.apple.quicklook.thumbnail
           NSExtensionPrincipalClass: "$(PRODUCT_MODULE_NAME).ThumbnailProvider"
         LSItemContentTypes:
           - com.apium.gcode
           - org.3mfproject.3mf
+          - com.apium.a3d
+          - public.standard-tesselated-geometry-format
+          - public.geometry-definition-format
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.apium.quicklook.host.thumbnail
@@ -88,19 +138,37 @@ targets:
     info:
       path: Extensions/PreviewExtension/Info.plist
       properties:
+        CFBundleShortVersionString: "$(MARKETING_VERSION)"
+        CFBundleVersion: "$(CURRENT_PROJECT_VERSION)"
         NSExtension:
           NSExtensionAttributes:
             QLSupportedContentTypes:
               - com.apium.gcode
               - org.3mfproject.3mf
+              - com.apium.a3d
+              - public.standard-tesselated-geometry-format
+              - public.geometry-definition-format
           NSExtensionPointIdentifier: com.apple.quicklook.preview
           NSExtensionPrincipalClass: "$(PRODUCT_MODULE_NAME).PreviewViewController"
         LSItemContentTypes:
           - com.apium.gcode
           - org.3mfproject.3mf
+          - com.apium.a3d
+          - public.standard-tesselated-geometry-format
+          - public.geometry-definition-format
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.apium.quicklook.host.preview
         CODE_SIGN_STYLE: Automatic
         CODE_SIGN_ENTITLEMENTS: Extensions/PreviewExtension/PreviewExtension.entitlements
     dependencies: []
+
+schemes:
+  ApiumQuickLookHost:
+    build:
+      targets:
+        ApiumQuickLookHost: all
+    run:
+      config: Debug
+    archive:
+      config: Release

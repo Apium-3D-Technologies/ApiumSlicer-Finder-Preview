@@ -39,3 +39,14 @@ build/
 .build/
 ApiumQuickLookPreview.xcodeproj/
 project.local.yml
+
+# CI workflows and deterministic parser fixtures
+!/.github/
+!/.github/workflows/
+!/.github/workflows/*.yml
+!/Tests/ApiumQuickLookSharedTests/Fixtures/
+!/Tests/ApiumQuickLookSharedTests/Fixtures/*.gcode
+!/Tests/ApiumQuickLookSharedTests/Fixtures/*.3mf
+
+# Distribution output
+dist/

@@ -3,6 +3,8 @@ import zlib
 
 struct ZipArchiveReader {
     private let data: Data
+    private let entries: [Entry]
+    private static let maxEntryBytes = 64 * 1024 * 1024
 
     struct Entry {
         let path: String
@@ -13,21 +15,21 @@ struct ZipArchiveReader {
     }
 
     init(url: URL) throws {
-        self.data = try Data(contentsOf: url, options: [.mappedIfSafe])
+        let bytes = try Data(contentsOf: url, options: [.mappedIfSafe])
+        self.data = bytes
+        self.entries = try Self.centralDirectoryEntries(in: bytes)
     }
 
     func readFile(named path: String) throws -> Data? {
-        let entries = try centralDirectoryEntries()
-        guard let entry = entries.first(where: { $0.path == path }) else {
+        guard let entry = entries.first(where: { Self.normalizedPath($0.path) == Self.normalizedPath(path) }) else {
             return nil
         }
         return try extract(entry: entry)
     }
 
     func readFirstExistingFile(candidates: [String]) throws -> Data? {
-        let entries = try centralDirectoryEntries()
         for candidate in candidates {
-            if let entry = entries.first(where: { $0.path == candidate }) {
+            if let entry = entries.first(where: { Self.normalizedPath($0.path) == Self.normalizedPath(candidate) }) {
                 return try extract(entry: entry)
             }
         }
@@ -35,65 +37,64 @@ struct ZipArchiveReader {
     }
 
     func listPaths(withPrefix prefix: String) throws -> [String] {
-        try centralDirectoryEntries()
-            .map(\.path)
-            .filter { $0.hasPrefix(prefix) }
+        entries.map(\.path).filter { Self.normalizedPath($0).hasPrefix(Self.normalizedPath(prefix)) }
     }
 
-    private func centralDirectoryEntries() throws -> [Entry] {
-        let eocdOffset = try findEndOfCentralDirectoryOffset()
-        let totalRecords = Int(readUInt16LE(at: eocdOffset + 10))
-        let centralDirOffset = Int(readUInt32LE(at: eocdOffset + 16))
+    private static func normalizedPath(_ path: String) -> String {
+        path.replacingOccurrences(of: "\\", with: "/")
+            .split(separator: "/").filter { $0 != "." }.joined(separator: "/").lowercased()
+    }
 
+    private static func centralDirectoryEntries(in data: Data) throws -> [Entry] {
+        guard data.count >= 22 else { throw PreviewParserError.invalidArchive }
+        let start = max(0, data.count - 22 - 0xffff)
+        let eocd = (start...(data.count - 22)).reversed().first { offset in
+            readUInt32LE(data, at: offset) == 0x06054b50
+                && offset + 22 + Int(readUInt16LE(data, at: offset + 20)) == data.count
+        }
+        guard let end = eocd,
+              readUInt16LE(data, at: end + 4) == 0,
+              readUInt16LE(data, at: end + 6) == 0,
+              readUInt16LE(data, at: end + 8) == readUInt16LE(data, at: end + 10)
+        else { throw PreviewParserError.invalidArchive }
+        let count = Int(readUInt16LE(data, at: end + 10))
+        let directorySize = Int(readUInt32LE(data, at: end + 12))
+        var cursor = Int(readUInt32LE(data, at: end + 16))
+        let directoryEnd = cursor + directorySize
+        guard count != 0xffff, directoryEnd <= end else { throw PreviewParserError.invalidArchive }
         var entries: [Entry] = []
-        entries.reserveCapacity(totalRecords)
-
-        var cursor = centralDirOffset
-        for _ in 0..<totalRecords {
-            let signature = readUInt32LE(at: cursor)
-            guard signature == 0x02014b50 else {
+        for _ in 0..<count {
+            guard cursor + 46 <= directoryEnd, readUInt32LE(data, at: cursor) == 0x02014b50 else {
                 throw PreviewParserError.invalidArchive
             }
-
-            let method = readUInt16LE(at: cursor + 10)
-            let compressedSize = Int(readUInt32LE(at: cursor + 20))
-            let uncompressedSize = Int(readUInt32LE(at: cursor + 24))
-            let fileNameLength = Int(readUInt16LE(at: cursor + 28))
-            let extraLength = Int(readUInt16LE(at: cursor + 30))
-            let commentLength = Int(readUInt16LE(at: cursor + 32))
-            let localHeaderOffset = Int(readUInt32LE(at: cursor + 42))
-
-            let nameStart = cursor + 46
-            let nameEnd = nameStart + fileNameLength
-            guard nameEnd <= data.count else { throw PreviewParserError.invalidArchive }
-            let nameData = data.subdata(in: nameStart..<nameEnd)
-            let name = String(data: nameData, encoding: .utf8) ?? ""
-
-            entries.append(
-                Entry(
-                    path: name,
-                    compressedSize: compressedSize,
-                    uncompressedSize: uncompressedSize,
-                    compressionMethod: method,
-                    localHeaderOffset: localHeaderOffset
-                )
-            )
-
-            cursor = nameEnd + extraLength + commentLength
+            let nameLength = Int(readUInt16LE(data, at: cursor + 28))
+            let next = cursor + 46 + nameLength + Int(readUInt16LE(data, at: cursor + 30))
+                + Int(readUInt16LE(data, at: cursor + 32))
+            guard next <= directoryEnd, readUInt16LE(data, at: cursor + 8) & 1 == 0 else {
+                throw PreviewParserError.invalidArchive
+            }
+            let name = String(decoding: data[(cursor + 46)..<(cursor + 46 + nameLength)], as: UTF8.self)
+            entries.append(Entry(path: name,
+                                 compressedSize: Int(readUInt32LE(data, at: cursor + 20)),
+                                 uncompressedSize: Int(readUInt32LE(data, at: cursor + 24)),
+                                 compressionMethod: readUInt16LE(data, at: cursor + 10),
+                                 localHeaderOffset: Int(readUInt32LE(data, at: cursor + 42))))
+            cursor = next
         }
-
         return entries
     }
 
     private func extract(entry: Entry) throws -> Data {
         let localOffset = entry.localHeaderOffset
-        let signature = readUInt32LE(at: localOffset)
+        guard localOffset + 30 <= data.count, entry.uncompressedSize <= Self.maxEntryBytes,
+              entry.compressedSize <= Self.maxEntryBytes else { throw PreviewParserError.invalidArchive }
+        let signature = Self.readUInt32LE(data, at: localOffset)
         guard signature == 0x04034b50 else {
             throw PreviewParserError.invalidArchive
         }
 
-        let fileNameLength = Int(readUInt16LE(at: localOffset + 26))
-        let extraLength = Int(readUInt16LE(at: localOffset + 28))
+        let fileNameLength = Int(Self.readUInt16LE(data, at: localOffset + 26))
+        let extraLength = Int(Self.readUInt16LE(data, at: localOffset + 28))
         let dataStart = localOffset + 30 + fileNameLength + extraLength
         let dataEnd = dataStart + entry.compressedSize
         guard dataStart >= 0, dataEnd <= data.count, dataEnd >= dataStart else {
@@ -104,6 +105,7 @@ struct ZipArchiveReader {
 
         switch entry.compressionMethod {
         case 0:
+            guard payload.count == entry.uncompressedSize else { throw PreviewParserError.invalidArchive }
             return payload
         case 8:
             return try inflateRawDeflate(payload, expectedSize: entry.uncompressedSize)
@@ -144,6 +146,7 @@ struct ZipArchiveReader {
 
                 let produced = chunkSize - Int(stream.avail_out)
                 if produced > 0 {
+                    guard result.count + produced <= expectedSize else { return Z_DATA_ERROR }
                     result.append(outBuffer, count: produced)
                 }
 
@@ -161,38 +164,20 @@ struct ZipArchiveReader {
             }
         }
 
-        guard status == Z_STREAM_END else {
+        guard status == Z_STREAM_END, result.count == expectedSize else {
             throw PreviewParserError.invalidArchive
         }
 
         return result
     }
 
-    private func findEndOfCentralDirectoryOffset() throws -> Int {
-        let signature: [UInt8] = [0x50, 0x4b, 0x05, 0x06]
-        let minimumSize = 22
-        guard data.count >= minimumSize else { throw PreviewParserError.invalidArchive }
-
-        let maxCommentLength = 0xFFFF
-        let searchStart = max(0, data.count - minimumSize - maxCommentLength)
-        let searchRange = searchStart..<(data.count - 3)
-
-        for i in searchRange.reversed() {
-            if data[i] == signature[0] && data[i + 1] == signature[1] && data[i + 2] == signature[2] && data[i + 3] == signature[3] {
-                return i
-            }
-        }
-
-        throw PreviewParserError.invalidArchive
-    }
-
-    private func readUInt16LE(at offset: Int) -> UInt16 {
+    private static func readUInt16LE(_ data: Data, at offset: Int) -> UInt16 {
         let b0 = UInt16(data[offset])
         let b1 = UInt16(data[offset + 1]) << 8
         return b0 | b1
     }
 
-    private func readUInt32LE(at offset: Int) -> UInt32 {
+    private static func readUInt32LE(_ data: Data, at offset: Int) -> UInt32 {
         let b0 = UInt32(data[offset])
         let b1 = UInt32(data[offset + 1]) << 8
         let b2 = UInt32(data[offset + 2]) << 16

@@ -5,32 +5,41 @@ struct QuickLookPreviewView: View {
     let metadata: PreviewMetadata
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 14) {
-            imageSection
-                .frame(maxWidth: .infinity)
-                .frame(height: 260)
-                .background(Color.black.opacity(0.07))
-                .clipShape(RoundedRectangle(cornerRadius: 12))
+        ScrollView {
+            VStack(alignment: .leading, spacing: 14) {
+                imageSection
+                    .frame(maxWidth: .infinity)
+                    .frame(height: 260)
+                    .background(Color.black.opacity(0.07))
+                    .clipShape(RoundedRectangle(cornerRadius: 12))
 
-            Group {
-                row(label: "Printer", value: metadata.printer)
-                row(label: "Project Version", value: metadata.projectVersion)
-                row(label: "Material Type", value: metadata.materialType)
-                row(label: "Nozzle Diameter", value: withUnit(metadata.nozzleDiameter, unit: "mm"))
-                row(label: "Nozzle Temperature", value: temperatureString(metadata.nozzleTemperature))
-                row(label: "Bed Temperature", value: temperatureString(metadata.bedTemperature))
-                row(label: "Layer Height", value: withUnit(metadata.layerHeight, unit: "mm"))
-                row(label: "Perimeters", value: metadata.perimeters)
-                row(label: "Infill Pattern", value: metadata.infillPattern)
-                row(label: "Infill Density", value: metadata.infillDensity)
-                if let printTime = metadata.printTime, !printTime.isEmpty {
-                    row(label: "Print Time", value: printTime)
+                if let mesh = metadata.mesh {
+                    row(label: "Format", value: mesh.format)
+                    row(label: "Dimensions", value: String(format: "%.2f × %.2f × %.2f mm", mesh.dimensions.x, mesh.dimensions.y, mesh.dimensions.z))
+                    row(label: "Vertices", value: String(mesh.vertexCount))
+                    row(label: "Faces", value: String(mesh.faceCount))
+                    row(label: "Triangles", value: String(mesh.triangleCount))
+                    row(label: "File Size", value: ByteCountFormatter.string(fromByteCount: Int64(mesh.fileSize), countStyle: .file))
+                } else {
+                    row(label: "Printer", value: metadata.printer)
+                    row(label: "Project Version", value: metadata.projectVersion)
+                    row(label: "Material Type", value: metadata.materialType)
+                    row(label: "Nozzle Diameter", value: withUnit(metadata.nozzleDiameter, unit: "mm"))
+                    row(label: "Nozzle Temperature", value: temperatureString(metadata.nozzleTemperature))
+                    row(label: "Bed Temperature", value: temperatureString(metadata.bedTemperature))
+                    row(label: "Layer Height", value: withUnit(metadata.layerHeight, unit: "mm"))
+                    row(label: "Perimeters", value: metadata.perimeters)
+                    row(label: "Infill Pattern", value: metadata.infillPattern)
+                    row(label: "Infill Density", value: metadata.infillDensity)
+                    if let printTime = metadata.printTime, !printTime.isEmpty {
+                        row(label: "Print Time", value: printTime)
+                    }
                 }
-            }
 
-            Spacer(minLength: 0)
+                Spacer(minLength: 0)
+            }
+            .padding(18)
         }
-        .padding(18)
         .frame(minWidth: 560, minHeight: 420)
     }
 
