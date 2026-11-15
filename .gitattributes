@@ -1,0 +1,7 @@
+* text=auto eol=lf
+*.bat text eol=crlf
+*.cmd text eol=crlf
+
+# Restrict GitHub Linguist language statistics to selected source/script types.
+* linguist-detectable=false
+*.swift linguist-detectable=true
